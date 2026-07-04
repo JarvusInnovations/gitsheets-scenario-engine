@@ -15,13 +15,16 @@ refs/fixtures/baseline/<scenario>      # per-scenario baseline, imported at boot
 refs/sessions/<session-key>            # one per live session (NOT refs/heads/ — see below)
 ```
 
-- **Boot import**: at startup the engine imports the fixtures from the running code's tree — for each scenario, `fixtures/base/` underlaid beneath `fixtures/scenarios/<name>/` — into the runtime store as one baseline commit per scenario. gitsheets' canonical serialization makes the import deterministic: the same fixture files always produce the same baseline tree hash, so re-boots are no-ops and two replicas of the same build agree byte-for-byte. The baseline commit message records the application version/commit for provenance.
-- `<session-key>` is derived from the authenticated principal plus an optional client-chosen discriminator, so one user can run parallel sessions. Key format must be ref-safe and collision-free; the spec suggests `<principal>/<discriminator|default>`.
+- **Boot import**: at startup the engine imports the fixtures from the running code's tree — for each scenario, `fixtures/base/` underlaid beneath `fixtures/scenarios/<name>/`, with the `fixtures/.gitsheets/` sheet definitions **embedded into the baseline tree itself** (each session thereby carries its own schema, so a session stays valid and replayable even after trunk's schemas evolve) — into the runtime store as one baseline commit per scenario, parented on the imported application commit (the build ships a depth-1 bundle of the app commit so it exists as a parent object). gitsheets' canonical serialization makes the import deterministic: the same fixture files always produce the same baseline tree hash, so re-boots are no-ops and two replicas of the same build agree byte-for-byte.
+- `<session-key>` is an **opaque generated value** (e.g. base36 timestamp + process counter + random suffix — the production-proven format): collision-free by construction, so parallel sessions per user are inherent and no create-time coordination is needed. The authenticated principal is recorded in the session's commits (author identity and/or trailer), never encoded in the key. Keys are returned to the client at login and presented on subsequent requests.
 - Sessions live outside `refs/heads/` so ordinary branch listings and clones stay clean; the git exposure layer (see facade spec) advertises them explicitly.
 
 ## Session lifecycle
 
-1. **Fork (login)** — resolve the scenario named in the login request; point `refs/sessions/<key>` at a new init commit whose parent is the scenario's baseline commit (provenance: `git log` traces every session back to the exact fixture state — and thus the exact application version — it forked from); create-only CAS — a concurrent login with the same key must fail loudly, not race.
+1. **Fork (login)** — resolve the scenario named in the login request, then create the session in the production-proven two-commit shape:
+   - a **root commit of the empty tree with no parents** (`initialize session <key>`) — the session's own root, unique to it;
+   - a **merge commit** carrying the scenario baseline's tree, with parents **`[sessionRoot, scenarioBaseline]`** and a `Scenario-name:` trailer (plus an application-version trailer).
+   Point `refs/sessions/<key>` at the merge commit. This shape is load-bearing, not cosmetic: `git log --first-parent` yields **pure session history** from the session's own root (trunk history never pollutes a session walk), while the second-parent edge makes provenance a real DAG edge — graph viewers render "session forked from fixture state X," `merge-base` works between any session and trunk, and fetching a session ref brings its source lineage along. The trailer makes every session **self-describing from its ref alone**: the engine recovers scenario identity by reading trailers from the log, never from side state.
 2. **Evolve (each request)** — see *Request=commit* below.
 3. **Reset** — delete and re-fork the ref. Resetting is always cheap; nothing else references session refs.
 4. **Expire/GC** — sessions are leases: a TTL since last commit, enforced by a sweep that deletes expired refs. Deleted session history becomes unreachable and is reclaimed by normal git GC. Retention overrides (e.g. keep a session pinned for debugging) are a tag: `refs/tags/sessions/<key>/pinned`.
@@ -48,6 +51,7 @@ Read-only requests do not commit by default; a deployment may opt into logging r
 
 - A session's history is a deterministic function of (fixture content at the running application version, ordered request/event log). Replaying the same requests against the same baseline must reproduce byte-identical trees — this is what makes sessions diffable across code versions and usable for agent evaluation.
 - Consequences: no wall-clock or randomness may leak into record content from the engine itself; simulated time is a record (a `clock` sheet or scenario field) advanced by requests/events; any id generation is derived (sequence records), not random.
+- **Session keys are the one sanctioned use of clock/randomness**: a key names a ref, it never enters record content or trees, and replay compares trees, not ref names — so key generation cannot affect determinism.
 - **Replay harness**: given a session ref, re-execute its request log (parsed from commit messages) against a fresh fork and diff the resulting trees. Divergence = behavior change; this doubles as a regression test between facade versions.
 
 ## Concurrency
