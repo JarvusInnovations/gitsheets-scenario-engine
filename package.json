@@ -1,6 +1,6 @@
 {
-  "name": "repo-scaffold",
-  "description": "gitsheets-scenario-engine template: repo scaffold (Fastify 5.x on Bun)",
+  "name": "gitsheets-scenario-engine",
+  "description": "A scenario simulation backend template: a dual-mode Fastify API facade where git is the world-state engine (Fastify 5.x on Bun)",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
