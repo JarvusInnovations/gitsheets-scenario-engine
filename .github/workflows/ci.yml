@@ -24,5 +24,26 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      - name: Format check
+        run: bun run format:check
+
       - name: Test
+        id: test
         run: bun test
+
+      # The e2e tier (src/tests/e2e/) runs as part of the Test step above —
+      # `bun test` discovers it automatically, and it needs no external
+      # services (checkout + bun only, exercising the fixture state of the
+      # commit under test — specs/facade.md § E2E harness). This step only
+      # runs when that step specifically failed (not on a lint/typecheck
+      # failure upstream, where no bundles would exist), and picks up
+      # whatever session bundles src/tests/e2e/harness.ts's e2eTest()
+      # wrapper wrote to var/e2e-artifacts on the way down.
+      - name: Upload e2e session bundles (on failure)
+        if: steps.test.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-session-bundles
+          path: var/e2e-artifacts
+          if-no-files-found: ignore
+          retention-days: 14
