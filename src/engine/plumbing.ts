@@ -61,9 +61,22 @@ async function run(
 /** Create a bare repository at `gitDir` if one doesn't already exist. Idempotent. */
 export async function ensureBareRepo(gitDir: string): Promise<void> {
   const headFile = Bun.file(`${gitDir}/HEAD`);
-  if (await headFile.exists()) return;
-  await $`mkdir -p ${gitDir}`.quiet();
-  await $`git init --bare -q ${gitDir}`.quiet();
+  if (!(await headFile.exists())) {
+    await $`mkdir -p ${gitDir}`.quiet();
+    await $`git init --bare -q ${gitDir}`.quiet();
+  }
+  // Enable reflogs for every ref update, including gitsheets' own internal
+  // session-ref updates during sessionTransact — bare repos default reflogs
+  // OFF. This gives the session-GC sweep (engine/session-gc.ts) a real
+  // wall-clock "when was this ref last touched" signal via `git reflog`,
+  // decoupled from the *commit object's* embedded date: fork/boot commits
+  // pin their author/committer date to a fixed epoch (see
+  // session.ts FORK_IDENTITY_DATE, boot-import.ts BASELINE_IDENTITY) so that
+  // e.g. resetSession() can reproduce a byte-identical commit hash — an
+  // unused, freshly-forked session would otherwise look eternally expired
+  // to a sweep that read the commit's own date instead. Idempotent; safe to
+  // run against an already-configured repo.
+  await run(gitDir, ["config", "core.logAllRefUpdates", "always"]);
 }
 
 /** Hash and write `content` as a blob; returns its object hash. */
@@ -210,4 +223,33 @@ export async function committerOf(gitDir: string, commitHash: string): Promise<C
     email: email ?? ENGINE_IDENTITY.email,
     date: date ?? "1970-01-01T00:00:00Z",
   };
+}
+
+/** Full ref names under `prefix` (e.g. `refs/sessions/`), or `[]` if none exist. */
+export async function listRefs(gitDir: string, prefix: string): Promise<string[]> {
+  const out = await run(gitDir, ["for-each-ref", "--format=%(refname)", prefix]);
+  return out.length > 0 ? out.split("\n") : [];
+}
+
+/**
+ * The real wall-clock ISO-8601 timestamp `ref` was last updated, read from
+ * its reflog (see ensureBareRepo's `core.logAllRefUpdates` comment for why
+ * this — not the tip commit's embedded date — is the right signal for
+ * "session last active"). Falls back to the tip commit's committer date if
+ * the ref has no reflog entry (e.g. a ref that predates
+ * `core.logAllRefUpdates` being enabled on this repo). Returns `null` if the
+ * ref doesn't resolve at all.
+ */
+export async function refLastUpdatedAt(gitDir: string, ref: string): Promise<string | null> {
+  try {
+    const out = await run(gitDir, ["reflog", "show", "--date=iso-strict", "-1", ref]);
+    const match = out.match(/@\{([^}]+)\}:/);
+    if (match?.[1]) return match[1];
+  } catch {
+    // No reflog (or no entries) for this ref — fall through to the
+    // commit-date fallback below.
+  }
+  const commitHash = await resolveRef(gitDir, ref);
+  if (!commitHash) return null;
+  return (await committerOf(gitDir, commitHash)).date;
 }
