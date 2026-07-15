@@ -1,0 +1,24 @@
+# The scenario's simulated time source — a single record, advanced by
+# request handlers (never the wall clock). Per specs/scenario-engine.md §
+# Determinism and replay: "simulated time is a record (a clock sheet or
+# scenario field) advanced by requests/events." Contrast with
+# src/tests/support/nondeterministic-routes.ts, which deliberately leaks
+# Date.now() into a record to demonstrate the replay divergence this sheet
+# is designed to avoid.
+[gitsheet]
+root = 'clock'
+path = '${{ id }}'
+
+[gitsheet.schema]
+type = 'object'
+required = ['id', 'tick']
+
+# Every scenario carries exactly one clock record, keyed 'clock' — see
+# fixtures/base/clock/clock.toml.
+[gitsheet.schema.properties.id]
+type = 'string'
+const = 'clock'
+
+[gitsheet.schema.properties.tick]
+type = 'integer'
+minimum = 0

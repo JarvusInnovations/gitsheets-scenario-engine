@@ -1,0 +1,43 @@
+# The demo world's state-machine record: pending -> accepted -> in-progress
+# -> completed (or canceled). See src/routes/orders.ts for the transitions —
+# specs/facade.md § Offline mode: "Behavior beyond CRUD... lives in plain
+# handler code operating on records. The discipline: all state lands in
+# records; anything in process memory is a bug."
+[gitsheet]
+root = 'orders'
+path = '${{ id }}'
+
+[gitsheet.schema]
+type = 'object'
+required = ['id', 'item', 'status', 'priority', 'created_tick', 'updated_tick']
+
+[gitsheet.schema.properties.id]
+type = 'string'
+pattern = '^[a-z0-9-]+$'
+
+[gitsheet.schema.properties.item]
+type = 'string'
+minLength = 1
+
+[gitsheet.schema.properties.status]
+type = 'string'
+enum = ['pending', 'accepted', 'in-progress', 'completed', 'canceled']
+
+[gitsheet.schema.properties.priority]
+type = 'string'
+enum = ['standard', 'rush']
+
+# Set once a courier accepts the order; absent while pending.
+[gitsheet.schema.properties.courier_id]
+type = 'string'
+
+# Simulated time, per specs/scenario-engine.md § Determinism and replay:
+# "simulated time is a record ... advanced by requests/events" — never the
+# wall clock. Both fields are ticks of the scenario's `clock` sheet.
+[gitsheet.schema.properties.created_tick]
+type = 'integer'
+minimum = 0
+
+[gitsheet.schema.properties.updated_tick]
+type = 'integer'
+minimum = 0

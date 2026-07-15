@@ -1,0 +1,24 @@
+# The demo world's roster of delivery couriers. See fixtures/README.md and
+# specs/scenario-engine.md § Concepts ("A World — the domain data model,
+# declared as gitsheets sheets"). Couriers flip available <-> busy as the
+# order state machine (src/routes/orders.ts) accepts/completes orders — the
+# only mutation path; no process memory tracks assignment.
+[gitsheet]
+root = 'couriers'
+path = '${{ id }}'
+
+[gitsheet.schema]
+type = 'object'
+required = ['id', 'name', 'status']
+
+[gitsheet.schema.properties.id]
+type = 'string'
+pattern = '^[a-z0-9-]+$'
+
+[gitsheet.schema.properties.name]
+type = 'string'
+minLength = 1
+
+[gitsheet.schema.properties.status]
+type = 'string'
+enum = ['available', 'busy', 'offline']

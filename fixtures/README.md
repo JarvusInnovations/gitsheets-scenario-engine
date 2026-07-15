@@ -39,5 +39,15 @@ agree byte-for-byte. See `specs/scenario-engine.md` § Runtime store and ref lay
 boot-import and ref-layout description — the engine plugin (`plans/engine-plugin.md`) is what
 actually performs this import.
 
-`scenarios/standard-day/` ships empty (`.gitkeep` only) as the first scenario placeholder; the
-demo-world plan (`plans/demo-world.md`) populates it.
+## The demo world
+
+`plans/demo-world.md` populates this tree with the template's worked example — a small
+delivery-desk domain (`couriers`, `orders`, `notifications`, `clock`) and two scenarios:
+
+- `standard-day` — the baseline: a full courier roster, a couple of pending orders.
+- `rush-hour` — the divergent scenario: two couriers already busy, so only one of two pending
+  rush orders can be accepted (the other 409s with `no couriers available`) — exercising the
+  same routes against genuinely different world state.
+
+See `src/routes/orders.ts` for the order state machine (`pending -> accepted -> in-progress ->
+completed`) these fixtures drive, and `scripts/demo.sh` for a runnable walkthrough.

@@ -1,0 +1,32 @@
+# Simulated side-effect records the order state machine emits on each
+# transition (specs/facade.md § Offline mode: "simulated side effects (push
+# notification records, event feeds) — lives in plain handler code operating
+# on records"). Read back via GET /orders/:id/notifications
+# (src/routes/orders.ts).
+[gitsheet]
+root = 'notifications'
+path = '${{ id }}'
+
+[gitsheet.schema]
+type = 'object'
+required = ['id', 'order_id', 'channel', 'message', 'tick']
+
+[gitsheet.schema.properties.id]
+type = 'string'
+pattern = '^[a-z0-9-]+$'
+
+[gitsheet.schema.properties.order_id]
+type = 'string'
+
+[gitsheet.schema.properties.channel]
+type = 'string'
+enum = ['push', 'sms', 'email']
+
+[gitsheet.schema.properties.message]
+type = 'string'
+minLength = 1
+
+# The clock tick this notification was emitted on — see clock.toml.
+[gitsheet.schema.properties.tick]
+type = 'integer'
+minimum = 0
