@@ -8,7 +8,7 @@ The facade presents **one API surface** with two interchangeable backends per ro
 
 The facade is **Fastify** (5.x, Node ≥ 20). This is prescribed, not suggested — the template ships working Fastify code, and the spec's structural concepts map onto Fastify primitives:
 
-- The **scenario engine binds as a Fastify plugin** (`fastify-plugin`): decorates the instance with the engine/store, decorates requests with the resolved session, and registers the session-resolution `onRequest` hook and the request=commit wrapping around handler execution.
+- The **scenario engine binds as a Fastify plugin** (`fastify-plugin`): decorates the instance with the engine/store, decorates requests with the resolved session — a **session-scoped `Repository` handle**, so gitsheets' commit-time auto-refresh stays session-local (see the scenario-engine spec's gitsheets mapping) — and registers the session-resolution `onRequest` hook and the request=commit wrapping around handler execution.
 - The **route registry entries attach as route config** (`config.lensMode`-style route options: `offline-only` | `online-only` | `dual`), so mode resolution happens per-route in a hook rather than in handler code, and the registry file is validated against the actually-registered routes at boot (drift between ledger and code fails startup).
 - **Serializer parity** between modes uses Fastify's per-route response schemas — one schema serializes both backends' responses, which is itself a contract-conformance check.
 
@@ -20,7 +20,7 @@ The facade is **Fastify** (5.x, Node ≥ 20). This is prescribed, not suggested 
 
 ## Offline mode
 
-- Route handlers read/write the session's world through typed sheet APIs inside the request's transaction (see scenario-engine spec).
+- Route handlers read/write the session's world through typed sheet APIs inside the request's transaction (the session-scoped `repo.transact` handler exposes `tx.sheet(name)`; `openStore` layers Standard Schema validators — Zod/Valibot/ArkType — over the in-core JSON Schema for typed handler code). See the scenario-engine spec.
 - Behavior beyond CRUD — state machines, validations, simulated side effects (push notification records, event feeds) — lives in plain handler code operating on records. The discipline: **all state lands in records**; anything in process memory is a bug (it breaks clone/replay fidelity).
 - Responses are shaped by the same serializers as online mode; contract tests run against both.
 

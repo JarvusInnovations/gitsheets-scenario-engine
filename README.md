@@ -15,9 +15,13 @@ A fifth use is native to 2026: the same primitive is an **agent sandbox** — fo
 
 ## Status
 
-Specs first (see [`specs/`](specs/)); implementation follows once the spec is settled. The original implementation hand-rolled its git plumbing on a legacy API; gitsheets 2.x (`transact`, CAS ref updates, schema validation, canonical serialization) has since absorbed most of that, so this template is mostly **conventions and middleware**, not engine work. Tracked publicly at JarvusInnovations/gitsheets#231.
+**Specs settled and trued up against shipped gitsheets 2.4.x; the implementation DAG is planned (see [`plans/`](plans/)).** The original implementation hand-rolled its git plumbing on a legacy API; gitsheets 2.x — `transact` (with explicit `parent`/`branch` targets), CAS ref updates, the commit-time freshness model, `withLock`, schema validation, canonical serialization, now published to npm and PyPI and cold-verified — has since absorbed the engine work, so this template is mostly **conventions and middleware**. Every open question the first spec draft flagged is now answered by a shipped gitsheets primitive (see the scenario-engine spec's *gitsheets 2.x mapping*). Tracked publicly at JarvusInnovations/gitsheets#231.
 
 ## Spec index
 
-- [`specs/scenario-engine.md`](specs/scenario-engine.md) — scenarios, sessions, ref layout, request=commit format, lifecycle
+- [`specs/scenario-engine.md`](specs/scenario-engine.md) — scenarios, sessions, ref layout, request=commit format, lifecycle, gitsheets mapping
 - [`specs/facade.md`](specs/facade.md) — the dual-mode seam, parity model, git exposure, E2E harness
+
+## Plans
+
+The build is decomposed as a dependency DAG in [`plans/`](plans/) — start at [`plans/README.md`](plans/README.md). Each plan freezes to `done` as the durable record of what got built.
