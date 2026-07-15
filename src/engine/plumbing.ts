@@ -231,6 +231,37 @@ export async function listRefs(gitDir: string, prefix: string): Promise<string[]
   return out.length > 0 ? out.split("\n") : [];
 }
 
+/** One changed path between two trees (see diffTrees below). */
+export interface TreeDiffEntry {
+  path: string;
+  status: "added" | "deleted" | "modified";
+}
+
+/**
+ * Path-level diff between two trees (`git diff --name-status treeA treeB`),
+ * collapsed to added/deleted/modified — renames and copies count as
+ * "modified" (a diff consumer here cares that a record's path changed
+ * content, not the rename-detection mechanics). Used by the agent-sandbox
+ * profile's judgment-by-diff scoring (engine/judging.ts) to compare a run
+ * session's final tree against a reference session's.
+ */
+export async function diffTrees(
+  gitDir: string,
+  treeA: string,
+  treeB: string,
+): Promise<TreeDiffEntry[]> {
+  if (treeA === treeB) return [];
+  const out = await run(gitDir, ["diff", "--name-status", treeA, treeB]);
+  if (out.length === 0) return [];
+  return out.split("\n").map((line) => {
+    const [code, ...pathParts] = line.split("\t");
+    const path = pathParts[pathParts.length - 1]!;
+    const status: TreeDiffEntry["status"] =
+      code?.[0] === "A" ? "added" : code?.[0] === "D" ? "deleted" : "modified";
+    return { path, status };
+  });
+}
+
 /**
  * The real wall-clock ISO-8601 timestamp `ref` was last updated, read from
  * its reflog (see ensureBareRepo's `core.logAllRefUpdates` comment for why

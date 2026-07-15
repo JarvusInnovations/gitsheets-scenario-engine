@@ -1,0 +1,68 @@
+# Evaluator records for the agent-sandbox profile's judgment-by-diff
+# convention (specs/facade.md § Agent-sandbox profile: "score it by
+# comparing against a reference session... written to a separate judging
+# sheet"). See src/engine/judging.ts.
+#
+# Unlike the other sheets in this directory, `judgments` records never live
+# inside a SESSION's own tree — a session diffed against a reference must
+# never be polluted by the act of recording its own verdict. This schema is
+# still embedded here (like every other fixtures/.gitsheets/ config) so it
+# ships with the same boot-import mechanism, but the records themselves are
+# written to a separate, persistent ref (refs/judging/records) that outlives
+# any individual session — see ensureJudgingRef() in src/engine/judging.ts.
+[gitsheet]
+root = 'judgments'
+path = '${{ id }}'
+
+[gitsheet.schema]
+type = 'object'
+required = [
+  'id',
+  'run_session',
+  'reference_session',
+  'scenario',
+  'matches',
+  'changed_paths',
+  'run_commit_count',
+  'reference_commit_count',
+]
+
+# Deterministic composite key (run session key + reference session key) —
+# never random — so re-judging the same pair upserts the existing verdict
+# rather than accumulating duplicates.
+[gitsheet.schema.properties.id]
+type = 'string'
+pattern = '^[a-z0-9-]+$'
+
+[gitsheet.schema.properties.run_session]
+type = 'string'
+
+[gitsheet.schema.properties.reference_session]
+type = 'string'
+
+[gitsheet.schema.properties.scenario]
+type = 'string'
+
+# True iff the run session's final tree is byte-identical to the reference
+# session's final tree.
+[gitsheet.schema.properties.matches]
+type = 'boolean'
+
+# Record paths that differ between the run and reference trees (e.g.
+# 'orders/order-1001.toml') — the diff evidence behind `matches`.
+[gitsheet.schema.properties.changed_paths]
+type = 'array'
+items.type = 'string'
+
+# First-parent commit-log lengths for each session — a cheap secondary
+# signal (e.g. did the run take more/fewer requests to reach its outcome).
+[gitsheet.schema.properties.run_commit_count]
+type = 'integer'
+minimum = 0
+
+[gitsheet.schema.properties.reference_commit_count]
+type = 'integer'
+minimum = 0
+
+[gitsheet.schema.properties.notes]
+type = 'string'
