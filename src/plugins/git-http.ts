@@ -44,6 +44,7 @@
 // prefix, with zero effect on the rest of the app's routes.
 import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { createHash, timingSafeEqual } from "node:crypto";
+import path from "node:path";
 
 /** CGI header-block / body separator, per RFC 3875 and verified against the shipped git-http-backend output. */
 const CRLFCRLF = "\r\n\r\n";
@@ -127,9 +128,21 @@ export interface InvokeGitHttpBackendOptions {
 export async function invokeGitHttpBackend(
   opts: InvokeGitHttpBackendOptions,
 ): Promise<CgiResponse> {
+  // Resolve once, to an absolute path, and reuse it for BOTH `cwd` and
+  // `GIT_PROJECT_ROOT` below. A relative `opts.gitDir` (the config default —
+  // see .env.example's RUNTIME_REPO_PATH=var/runtime.git) bit this
+  // otherwise: Bun.spawn's `cwd` resolves relative to the *parent* process's
+  // cwd, changing the subprocess's actual working directory to
+  // `<parent-cwd>/var/runtime.git` — and git-http-backend then resolves the
+  // *env var* `GIT_PROJECT_ROOT=var/runtime.git` relative to THAT (new) cwd,
+  // landing on the nonexistent `.../var/runtime.git/var/runtime.git` and
+  // silently 404ing the ref advertisement. Verified empirically against the
+  // shipped git 2.51 binary while exercising plans/demo-world.md's demo
+  // script end-to-end.
+  const gitDir = path.resolve(opts.gitDir);
   const env: Record<string, string> = {
     PATH: process.env.PATH ?? "",
-    GIT_PROJECT_ROOT: opts.gitDir,
+    GIT_PROJECT_ROOT: gitDir,
     // Skip the git-daemon-export-ok file check — this repo has no anonymous
     // git:// daemon; exposure is controlled entirely by this plugin.
     GIT_HTTP_EXPORT_ALL: "1",
@@ -146,7 +159,7 @@ export async function invokeGitHttpBackend(
 
   const proc = Bun.spawn({
     cmd: ["git", "http-backend"],
-    cwd: opts.gitDir,
+    cwd: gitDir,
     env,
     stdin: opts.body,
     stdout: "pipe",

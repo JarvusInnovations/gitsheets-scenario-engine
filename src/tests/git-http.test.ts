@@ -3,7 +3,7 @@
 // the smart-HTTP endpoint, exercised by the actual `git` CLI. See
 // specs/facade.md § Git exposure, plans/git-exposure.md.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
@@ -11,6 +11,7 @@ import { buildTestApp, scaffoldFixtures } from "./helpers.ts";
 import { registerDemoRoutes } from "./support/demo-routes.ts";
 import * as plumbing from "../engine/plumbing.ts";
 import { SESSION_HEADER } from "../plugins/engine.ts";
+import { invokeGitHttpBackend } from "../plugins/git-http.ts";
 
 const TOKEN = "test-operator-token";
 
@@ -259,6 +260,58 @@ describe("git exposure: operator-auth gate", () => {
       expect(response.statusCode).toBe(401);
     } finally {
       await openFastify.close();
+    }
+  });
+});
+
+describe("invokeGitHttpBackend: relative gitDir paths resolve correctly", () => {
+  // Regression test for a bug found while exercising plans/demo-world.md's
+  // demo script end-to-end against the DEFAULT config (RUNTIME_REPO_PATH
+  // defaults to the relative "var/runtime.git" — see .env.example). Every
+  // other test in this file builds its app via buildTestApp(), whose
+  // RUNTIME_REPO_PATH is always an mkdtempSync ABSOLUTE path — so this class
+  // of bug (Bun.spawn's `cwd` changing the subprocess's actual working
+  // directory, then GIT_PROJECT_ROOT being resolved a second time relative
+  // to THAT) never surfaced there. See invokeGitHttpBackend's module comment
+  // for the exact failure mode.
+  test("ref advertisement succeeds when gitDir is passed as a path relative to process.cwd()", async () => {
+    // Must be a genuine DESCENDANT of process.cwd() (no ".." segments) to
+    // reproduce the bug: the failure mode is specifically "the subprocess's
+    // cwd becomes cwd + relativeGitDir, then GIT_PROJECT_ROOT (the same
+    // relative string) is resolved a SECOND time against that new cwd." A
+    // relative path built from an unrelated system tmpdir (e.g. via
+    // path.relative to /tmp/...) walks up far enough via ".." that the
+    // double-resolution round-trips back to the right place, masking the
+    // bug — this reproduces it under `var/`, exactly like the shipped
+    // default RUNTIME_REPO_PATH=var/runtime.git (`var/` is gitignored).
+    const testDir = path.join(process.cwd(), "var", `test-relative-gitdir-${Date.now()}`);
+    const absoluteGitDir = path.join(testDir, "r.git");
+    const relativeGitDir = path.relative(process.cwd(), absoluteGitDir);
+    try {
+      mkdirSync(testDir, { recursive: true });
+      await plumbing.ensureBareRepo(absoluteGitDir);
+      const commitHash = await plumbing.commitTree(absoluteGitDir, plumbing.EMPTY_TREE_HASH, {
+        parents: [],
+        message: "probe",
+      });
+      // Under an advertised prefix (see git-http.ts's hardcoded
+      // uploadpack.hideRefs injection) — otherwise a correctly-resolved but
+      // empty advertisement would look identical to this bug's 404.
+      await plumbing.updateRef(absoluteGitDir, "refs/sessions/probe", commitHash, null);
+
+      const result = await invokeGitHttpBackend({
+        gitDir: relativeGitDir,
+        method: "GET",
+        pathInfo: "/info/refs",
+        queryString: "service=git-upload-pack",
+        body: new Uint8Array(0),
+      });
+
+      expect(result.status).toBe(200);
+      expect(result.headers["Content-Type"]).toBe("application/x-git-upload-pack-advertisement");
+      expect(Buffer.from(result.body).toString("utf8")).toContain("refs/sessions/probe");
+    } finally {
+      rmSync(testDir, { recursive: true, force: true });
     }
   });
 });
