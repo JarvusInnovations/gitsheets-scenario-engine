@@ -5,6 +5,7 @@ import cors from "@fastify/cors";
 import envPlugin from "./plugins/env.ts";
 import enginePlugin from "./plugins/engine.ts";
 import gitHttpPlugin from "./plugins/git-http.ts";
+import sessionGcPlugin from "./plugins/session-gc.ts";
 import healthRoutes from "./routes/health.ts";
 
 export const app: FastifyPluginAsync = async (fastify) => {
@@ -22,6 +23,12 @@ export const app: FastifyPluginAsync = async (fastify) => {
   // 3. Scenario engine — the runtime store, boot import, and the
   // session-resolution hook (see specs/scenario-engine.md, specs/facade.md).
   await fastify.register(enginePlugin);
+
+  // 3b. Session lifecycle GC — periodic TTL sweep + pin/unpin (see
+  // specs/scenario-engine.md § Session lifecycle (Expire/GC)). Depends on
+  // the engine plugin for fastify.engine.gitDir's config only; registered
+  // after it for readability, no strict ordering requirement otherwise.
+  await fastify.register(sessionGcPlugin);
 
   // 4. Routes
   await fastify.register(healthRoutes);
