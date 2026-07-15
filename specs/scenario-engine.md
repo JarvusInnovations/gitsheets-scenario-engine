@@ -38,9 +38,14 @@ Every mutating API request handled in offline mode executes as **one gitsheets t
 - **Trailers** (machine-readable; the debugging and analysis surface):
   - `Session:` session key
   - `Scenario:` scenario name at fork
-  - `Request-id:` correlation id
-  - `Response-code:` HTTP status
-  - `User-agent:`, `Host:` as available
+  - `Request-Id:` correlation id
+  - `Response-Code:` HTTP status
+  - `User-Agent:`, `Host:` as available
+
+  Trailer keys use gitsheets' enforced HTTP-header-style casing (each
+  hyphen-segment capitalized: `Request-Id`, not `Request-id` —
+  `repo.transact` throws `TransactionError('commit_failed')` on a
+  non-conforming key; see [gitsheets `api/transaction.md`](https://github.com/JarvusInnovations/gitsheets/blob/develop/specs/api/transaction.md)).
 - **Author/committer**: the authenticated principal as author (pseudonymized per deployment policy); the engine as committer. `git blame` on any record answers "which request changed this."
 
 Read-only requests do not commit by default; a deployment may opt into logging reads as empty-tree-delta commits when full interaction capture matters (e.g. training review), accepting the history volume.
@@ -57,16 +62,16 @@ Read-only requests do not commit by default; a deployment may opt into logging r
 ## Concurrency
 
 - One session = one writer at a time: requests within a session serialize (per-session queue); the CAS ref update is the backstop, and a lost race is a bug, not a retry loop.
-- Cross-session concurrency is unlimited — sessions share nothing but ancestry.
+- Cross-session concurrency is unlimited — sessions share nothing but ancestry. **Implementation note (engine-plugin, gitsheets 2.4.0):** the shipped gitsheets core allows only one open transaction per physical `gitDir` at a time (see § gitsheets 2.x mapping below) — commit-phase work for every session currently serializes through one process-wide queue rather than running git-level-parallel across sessions. Reads and non-commit-phase work are unaffected. Flagged as a follow-up: true cross-session parallelism would need either an upstream gitsheets change (a per-gitDir queue rather than a throwing guard) or per-session working directories, both out of scope for the initial engine-plugin build.
 
 ## gitsheets 2.x mapping
 
 The engine is now **mostly conventions over shipped gitsheets primitives**: the 2.x line (2.4.0 current, bindings published to npm and cold-verified) has absorbed what the original implementation hand-rolled on a legacy API. The mapping is concrete, and the questions the first draft flagged as open have since been answered by shipped behavior:
 
 - **Session refs as transaction targets** — `repo.transact` takes explicit `parent` and `branch` options ([gitsheets `api/repository.md`](https://github.com/JarvusInnovations/gitsheets/blob/develop/specs/api/repository.md)): fork and every request commit pass `parent` and `branch` = `refs/sessions/<key>`. Because session refs live outside `refs/heads/`, `branch` must be passed explicitly — transact only defaults it for actual branches. That's the one ergonomic wrinkle, and it's a parameter, not a gap.
-- **Post-commit read freshness** — resolved by the shipped freshness model ([gitsheets `behaviors/freshness.md`](https://github.com/JarvusInnovations/gitsheets/blob/develop/specs/behaviors/freshness.md)): `repo.transact` auto-rebinds every live `Sheet` to the new `HEAD` tree on commit, so a handler's later reads within the same request observe its own writes with no manual refresh; `repo.refresh()` covers out-of-band ref movement (a GC sweep, an external fetch).
-  - **Design consequence — one `Repository` handle per session (or per request), never one global handle.** Auto-refresh rebinds the sheets *that repository instance* issued; a single shared handle across concurrent sessions would let session A's commit yank session B's read snapshot. The engine plugin scopes a handle to the resolved session, which also gives each session its own transaction mutex for free.
-- **Per-session single-writer serialization** — `repo.withLock` is the per-session queue; transact's own commit mutex and the CAS ref update are the backstop. A lost CAS race means two writers entered one session — a bug to surface, not a retry loop, exactly as *Concurrency* requires.
+- **Post-commit read freshness** — the shipped freshness model ([gitsheets `behaviors/freshness.md`](https://github.com/JarvusInnovations/gitsheets/blob/develop/specs/behaviors/freshness.md)) auto-rebinds every live `Sheet` a `Repository` issued to the new **literal `HEAD` tree** on commit — verified against the shipped 2.4.0 source (`Repository#resolveReadTree` runs `git rev-parse HEAD^{tree}` unconditionally). Session refs live outside `refs/heads/` and are never `HEAD`, so `repo.openSheet()` **cannot** be used for session-scoped reads regardless of instance topology. The engine therefore never calls `openSheet`/`openSheets` for session data: every read and write goes through `repo.transact({ parent: sessionRef, branch: sessionRef }, tx => tx.sheet(...))`, relying on transact's no-op detection (unchanged tree ⇒ no commit) to keep reads commit-free.
+  - **Design consequence — one *shared* `Repository` handle process-wide, not one per session.** Verified empirically: two separate `Repository` instances racing a `transact` call against the same `gitDir` don't queue — the native core enforces "one open transaction per physical gitDir" as a hard *throw* (`TransactionError('transaction_in_progress')`), not the fair queue the next bullet describes. That queue is a **per-instance** JS mutex (confirmed in `dist/repository.js`), not a per-gitDir one, so it only serializes calls made through the *same* `Repository` object. "One handle per session (or per request)" — the original recommendation here — reintroduces the very race it was meant to prevent under concurrent cross-session load. A single shared instance restores the documented queueing behavior for every session's `transact` call.
+- **Per-session single-writer serialization** — with one shared `Repository` handle (see above), transact's own per-instance mutex *is* the queue every session's writes funnel through — it now also serializes across sessions rather than only within one, a real (and flagged) narrowing of the *Concurrency* section below versus the original per-session-handle design. The CAS ref update remains the backstop within a session: a lost race there is a bug to surface, not a retry loop.
 - **Streaming payloads** — `repo.readBlobStream` serves large captured request/response bodies or attachment blobs without materializing them, for scenarios that carry media.
 - Maps unchanged from the first draft: one `repo.transact` per request, CAS `updateRef`, in-core JSON-Schema validation, canonical serialization (idempotent event replay), bare-repo operation, and the indexing behavior ([gitsheets `behaviors/indexing.md`](https://github.com/JarvusInnovations/gitsheets/blob/develop/specs/behaviors/indexing.md)) for the facade's lookups.
 
