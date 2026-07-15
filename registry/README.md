@@ -39,7 +39,10 @@ gitDir — see `runtime-store.ts`'s module comment on why that races).
 (three of them the order state machine's transitions), one `online-only`. `POST
 /session/login` (`src/routes/session.ts`) has no entry here deliberately — see that
 file's module comment for why login sits outside the dual-mode facade, same as
-`/health`.
+`/health`. The agent-sandbox profile's `/sandbox/*` routes (`src/routes/sandbox.ts`:
+fork-per-run, judgment-by-diff, replay-based regression — see `specs/facade.md` §
+Agent-sandbox profile) extend the same exemption for the same reason: sandbox/runtime
+infrastructure for evaluating agents against the engine, not dual-mode business routes.
 
 Tests that exercise the drift mechanism in isolation from the real demo world still
 scaffold their own scratch registry (`scaffoldRegistry()` in `src/tests/helpers.ts`,

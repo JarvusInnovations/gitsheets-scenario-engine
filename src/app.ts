@@ -11,6 +11,7 @@ import healthRoutes from "./routes/health.ts";
 import sessionRoutes from "./routes/session.ts";
 import ordersRoutes from "./routes/orders.ts";
 import couriersRoutes from "./routes/couriers.ts";
+import sandboxRoutes from "./routes/sandbox.ts";
 
 export const app: FastifyPluginAsync = async (fastify) => {
   // 1. Environment configuration first — everything else may read fastify.config
@@ -46,6 +47,13 @@ export const app: FastifyPluginAsync = async (fastify) => {
   await fastify.register(sessionRoutes);
   await fastify.register(ordersRoutes);
   await fastify.register(couriersRoutes);
+
+  // 5b. Agent-sandbox profile — fork-per-run, judgment-by-diff, and
+  // replay-based regression evals, layered over the same engine (see
+  // specs/facade.md § Agent-sandbox profile, src/routes/sandbox.ts). No
+  // config.mode, no ledger entry — same infrastructure exemption as
+  // session/health above.
+  await fastify.register(sandboxRoutes);
 
   // 6. Git exposure — read-only smart-HTTP endpoint over the runtime repo
   // (see specs/facade.md § Git exposure, src/plugins/git-http.ts). Not
