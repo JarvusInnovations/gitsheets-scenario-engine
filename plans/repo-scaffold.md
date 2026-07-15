@@ -31,7 +31,7 @@ Stand up the buildable skeleton every later plan lands into: a TypeScript-on-**B
 - [x] `bun install && bun run typecheck && bun test` green on a clean checkout with the pinned Bun (also ran `bun run lint`; all clean — see Notes)
 - [x] `import` of `gitsheets` under Bun loads the napi native binding (platform prebuild resolves)
 - [x] Fastify boots and serves the health route; `fastify.inject()` reaches it (also verified with a real `bun run start` + `curl`, not just inject)
-- [ ] `fixtures/` layout present and documented; CI green — layout/docs done and the workflow runs the identical commands green locally, but no GitHub Actions run has executed against this branch yet at closeout time; see Notes
+- [x] `fixtures/` layout present and documented; CI green (confirmed on PR #3's first Actions run, after this line was originally written pre-CI-run — see Notes)
 
 ## Risks / unknowns
 
@@ -74,14 +74,12 @@ Stand up the buildable skeleton every later plan lands into: a TypeScript-on-**B
   convention, not a mistake, if it looks odd on review.
 - CI workflow (`.github/workflows/ci.yml`) was authored against the current
   `oven-sh/setup-bun` README (pinned `@v2`, `bun-version-file: .tool-versions`) and
-  runs the exact same four commands verified locally, but the workflow itself has not
-  yet been observed to pass in GitHub Actions — no run exists against this branch at
-  the time of this closeout commit. Left unverified in Validation above accordingly.
+  runs the exact same four commands verified locally. Opening PR #3 triggered the first
+  Actions run against this branch, which passed (`test: pass`) — confirmed and checked
+  off above in a follow-up commit to this closeout.
 
 ## Follow-ups
 
-- Confirm the CI workflow goes green on the PR (first real Actions run against this
-  branch).
 - Consider re-adding the setup-guide's health-check-skipping logging hooks once a real
   health-check prober (k8s liveness, uptime monitor, etc.) exists and the log noise is
   worth suppressing.
