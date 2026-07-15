@@ -1,0 +1,13 @@
+# Placeholder sheet config — the demo-world plan (plans/demo-world.md) replaces
+# this with the real world model. Kept here so the fixtures/ trunk layout has a
+# concrete .gitsheets/ example from the start.
+[gitsheet]
+root = 'examples'
+path = '${{ slug }}'
+
+[gitsheet.schema]
+type = 'object'
+required = ['slug']
+
+[gitsheet.schema.properties.slug]
+type = 'string'
