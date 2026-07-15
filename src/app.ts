@@ -3,12 +3,9 @@ import fp from "fastify-plugin";
 import cors from "@fastify/cors";
 
 import envPlugin from "./plugins/env.ts";
+import enginePlugin from "./plugins/engine.ts";
 import healthRoutes from "./routes/health.ts";
 
-// This is the seam later plans build on: the scenario engine registers here
-// as a fastify-plugin decorating the instance with the engine/store and the
-// session-resolution hook (see specs/scenario-engine.md, specs/facade.md).
-// Nothing engine-specific lives here yet — just the bare frame.
 export const app: FastifyPluginAsync = async (fastify) => {
   // 1. Environment configuration first — everything else may read fastify.config
   await fastify.register(envPlugin);
@@ -21,7 +18,11 @@ export const app: FastifyPluginAsync = async (fastify) => {
     credentials: true,
   });
 
-  // 3. Routes
+  // 3. Scenario engine — the runtime store, boot import, and the
+  // session-resolution hook (see specs/scenario-engine.md, specs/facade.md).
+  await fastify.register(enginePlugin);
+
+  // 4. Routes
   await fastify.register(healthRoutes);
 };
 
