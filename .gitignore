@@ -1,6 +1,10 @@
 # dependencies (bun install)
 node_modules
 
+# the scenario engine's runtime store (a bare git repo, rebuilt at boot from
+# fixtures/ — see specs/scenario-engine.md § Runtime store and ref layout)
+var
+
 # output
 out
 dist
