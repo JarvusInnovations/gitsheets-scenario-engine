@@ -22,6 +22,10 @@ A fifth use is native to 2026: the same primitive is an **agent sandbox** — fo
 - [`specs/scenario-engine.md`](specs/scenario-engine.md) — scenarios, sessions, ref layout, request=commit format, lifecycle, gitsheets mapping
 - [`specs/facade.md`](specs/facade.md) — the dual-mode seam, parity model, git exposure, E2E harness
 
+## Recipe
+
+[`docs/recipe.md`](docs/recipe.md) walks the whole pattern — git-as-world-state, the dual-mode seam, request=commit, clone-the-running-server, and the five uses above — with every command run against this repo's demo world and pasted verbatim, not invented.
+
 ## Plans
 
 The build is decomposed as a dependency DAG in [`plans/`](plans/) — start at [`plans/README.md`](plans/README.md). Each plan freezes to `done` as the durable record of what got built.
@@ -68,8 +72,9 @@ git -c http.extraHeader="Authorization: Bearer $GIT_EXPOSURE_TOKEN" \
 # Pure session history — trunk/baseline commits never pollute this walk.
 git log --first-parent refs/heads/session
 
-# Every record mutation, with the request that caused it.
-git blame -- <sheet-root>/<record-path>
+# Every record mutation, with the request that caused it. Name the fetched
+# ref explicitly — a freshly `git init`ed repo has no HEAD to blame from.
+git blame refs/heads/session -- <sheet-root>/<record-path>
 
 # Provenance: the session's fork point is the one commit in --first-parent
 # history with two parents (specs/scenario-engine.md § Session lifecycle);
