@@ -34,8 +34,18 @@ fixture import; `src/routing/registry-store.ts` reads it back through the engine
 *existing* shared gitsheets `Repository` instance (never a second one against the same
 gitDir — see `runtime-store.ts`'s module comment on why that races).
 
-`routes/` ships empty (`.gitkeep` only) — the template's dual-mode routes (and their
-ledger entries) are added by the plans that build them (e.g. `plans/demo-world.md`).
-Tests exercise the mechanism against a scaffolded scratch registry
-(`scaffoldRegistry()` in `src/tests/helpers.ts`), the same pattern `fixtures/README.md`
-documents for `scaffoldFixtures()`.
+`plans/demo-world.md` populates `routes/` with the demo world's six entries
+(`src/routes/orders.ts`, `src/routes/couriers.ts`) — one `dual`, four `offline-only`
+(three of them the order state machine's transitions), one `online-only`. `POST
+/session/login` (`src/routes/session.ts`) has no entry here deliberately — see that
+file's module comment for why login sits outside the dual-mode facade, same as
+`/health`.
+
+Tests that exercise the drift mechanism in isolation from the real demo world still
+scaffold their own scratch registry (`scaffoldRegistry()` in `src/tests/helpers.ts`,
+the same pattern `fixtures/README.md` documents for `scaffoldFixtures()`) — but because
+`app.ts` always registers the demo world's routes too, any such test's scaffolded
+ledger must include matching entries for them as well (see the `DEMO_LEDGER` constant
+in `src/tests/routing.test.ts`) or the boot-time drift check correctly flags the gap.
+`src/tests/demo-world.test.ts` instead boots against the real `registry/` and
+`fixtures/` trees, proving the shipped ledger and the shipped routes actually agree.

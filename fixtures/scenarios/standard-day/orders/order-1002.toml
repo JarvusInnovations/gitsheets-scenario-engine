@@ -1,0 +1,6 @@
+id = "order-1002"
+item = "insulated-lunch-bag"
+status = "pending"
+priority = "rush"
+created_tick = 0
+updated_tick = 0

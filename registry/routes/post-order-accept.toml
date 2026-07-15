@@ -1,0 +1,6 @@
+id = "post-order-accept"
+method = "POST"
+path = "/orders/:id/accept"
+mode = "offline-only"
+behaviors = ["demo-world: order-accept"]
+notes = "State machine step 1/3: pending -> accepted. Assigns the first available courier and advances the scenario clock; 409s with no couriers available if none are free."

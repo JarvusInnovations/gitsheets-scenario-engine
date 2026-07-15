@@ -1,0 +1,6 @@
+id = "post-order-complete"
+method = "POST"
+path = "/orders/:id/complete"
+mode = "offline-only"
+behaviors = ["demo-world: order-complete"]
+notes = "State machine step 3/3: in-progress -> completed. Frees the assigned courier back to available."

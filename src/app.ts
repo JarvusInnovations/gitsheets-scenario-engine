@@ -8,6 +8,9 @@ import gitHttpPlugin from "./plugins/git-http.ts";
 import sessionGcPlugin from "./plugins/session-gc.ts";
 import routingPlugin from "./plugins/routing.ts";
 import healthRoutes from "./routes/health.ts";
+import sessionRoutes from "./routes/session.ts";
+import ordersRoutes from "./routes/orders.ts";
+import couriersRoutes from "./routes/couriers.ts";
 
 export const app: FastifyPluginAsync = async (fastify) => {
   // 1. Environment configuration first — everything else may read fastify.config
@@ -36,8 +39,13 @@ export const app: FastifyPluginAsync = async (fastify) => {
   // plans/dual-mode-routing.md). Needs the engine plugin's session hook.
   await fastify.register(routingPlugin);
 
-  // 5. Routes
+  // 5. Routes — health/session are plain (outside the dual-mode facade, no
+  // config.mode, see routes/session.ts); orders/couriers are the demo world
+  // (specs/facade.md § Template deliverables item 2, plans/demo-world.md).
   await fastify.register(healthRoutes);
+  await fastify.register(sessionRoutes);
+  await fastify.register(ordersRoutes);
+  await fastify.register(couriersRoutes);
 
   // 6. Git exposure — read-only smart-HTTP endpoint over the runtime repo
   // (see specs/facade.md § Git exposure, src/plugins/git-http.ts). Not

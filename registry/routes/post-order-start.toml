@@ -1,0 +1,6 @@
+id = "post-order-start"
+method = "POST"
+path = "/orders/:id/start"
+mode = "offline-only"
+behaviors = ["demo-world: order-start"]
+notes = "State machine step 2/3: accepted -> in-progress."

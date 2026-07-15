@@ -36,6 +36,55 @@ const DEMO_LEDGER: RegistryEntryFixture[] = [
     mode: "dual",
     behaviors: ["registry-demo: catalog-lookup"],
   },
+  // The demo world's routes (src/routes/orders.ts, src/routes/couriers.ts)
+  // are permanent app.ts routes now, not test-injected ones — every
+  // buildTestApp() call in this describe block boots the WHOLE app, so its
+  // scaffolded registry must carry these too or the boot-time drift check
+  // (this very mechanism) correctly flags them as missing. Mirrors
+  // registry/routes/*.toml verbatim (method/path/mode is all diffRegistry
+  // checks).
+  {
+    id: "get-order",
+    method: "GET",
+    path: "/orders/:id",
+    mode: "dual",
+    behaviors: ["demo-world: order-lookup"],
+  },
+  {
+    id: "get-order-notifications",
+    method: "GET",
+    path: "/orders/:id/notifications",
+    mode: "offline-only",
+    behaviors: ["demo-world: order-notifications"],
+  },
+  {
+    id: "post-order-accept",
+    method: "POST",
+    path: "/orders/:id/accept",
+    mode: "offline-only",
+    behaviors: ["demo-world: order-accept"],
+  },
+  {
+    id: "post-order-start",
+    method: "POST",
+    path: "/orders/:id/start",
+    mode: "offline-only",
+    behaviors: ["demo-world: order-start"],
+  },
+  {
+    id: "post-order-complete",
+    method: "POST",
+    path: "/orders/:id/complete",
+    mode: "offline-only",
+    behaviors: ["demo-world: order-complete"],
+  },
+  {
+    id: "get-courier-upstream",
+    method: "GET",
+    path: "/couriers/:id/upstream",
+    mode: "online-only",
+    behaviors: ["demo-world: courier-upstream-lookup"],
+  },
 ];
 
 describe("resolveBackend (pure)", () => {
