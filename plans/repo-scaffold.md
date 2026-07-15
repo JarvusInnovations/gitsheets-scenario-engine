@@ -1,10 +1,11 @@
 ---
-status: planned
+status: done
 depends: []
 specs:
   - specs/facade.md
   - specs/scenario-engine.md
 issues: []
+pr: 3
 ---
 
 # Repo scaffold: Fastify project + fixtures layout
@@ -27,10 +28,10 @@ Stand up the buildable skeleton every later plan lands into: a TypeScript-on-**B
 
 ## Validation
 
-- [ ] `bun install && bun run typecheck && bun test` green on a clean checkout with the pinned Bun
-- [ ] `import` of `gitsheets` under Bun loads the napi native binding (platform prebuild resolves)
-- [ ] Fastify boots and serves the health route; `fastify.inject()` reaches it
-- [ ] `fixtures/` layout present and documented; CI green
+- [x] `bun install && bun run typecheck && bun test` green on a clean checkout with the pinned Bun (also ran `bun run lint`; all clean — see Notes)
+- [x] `import` of `gitsheets` under Bun loads the napi native binding (platform prebuild resolves)
+- [x] Fastify boots and serves the health route; `fastify.inject()` reaches it (also verified with a real `bun run start` + `curl`, not just inject)
+- [x] `fixtures/` layout present and documented; CI green (confirmed on PR #3's first Actions run, after this line was originally written pre-CI-run — see Notes)
 
 ## Risks / unknowns
 
@@ -38,8 +39,49 @@ Stand up the buildable skeleton every later plan lands into: a TypeScript-on-**B
 
 ## Notes
 
-_(populated at closeout)_
+- **gitsheets napi under Bun — confirmed working, no workaround needed.** A throwaway
+  script (`import { openRepo } from 'gitsheets'; await openRepo({ gitDir })` against a
+  fresh bare repo) ran clean under `bun run` with `bun.lock`-installed dependencies.
+  `bun add` correctly resolved gitsheets' transitive `@gitsheets/core-napi`
+  `optionalDependencies` down to the platform prebuild
+  (`@gitsheets/core-napi-linux-x64-gnu@0.3.0` on this Linux x64 box — confirmed present
+  under `node_modules/@gitsheets/`), and `openRepo()` returned a live `Repository`
+  handle. No Bun-specific resolution quirks observed. gitsheets is pinned `~2.4.0` (the
+  2.4.x line; 2.4.0 is current).
+- All four gate commands are clean on a from-scratch `node_modules` (`rm -rf
+  node_modules && bun install`): `bun run typecheck`, `bun run lint` (oxlint, exit 0),
+  `bun test` (1 pass), and `bun run format:check` (oxfmt, added as a fifth script beyond
+  the plan's ask since the jarvus-fastify skill's CI section prescribes oxlint+oxfmt as
+  the house linter/formatter pair — used that instead of falling back to `tsc --noEmit`
+  as `lint`).
+- Verified the health route two ways: `fastify.inject()` in `src/tests/health.test.ts`
+  (the committed regression test) and a real `bun run start` + `curl
+  http://localhost:3001/health` → `200 {"status":"ok",...}`, confirmed via server log
+  output before shutting the process down.
+- `GET /health` is registered at the bare path (no `/api` prefix), per this plan's own
+  task framing ("a `GET /health` route") rather than the setup-guide's `/api/health`
+  example — a deliberate deviation the orchestrator should confirm reads correctly; the
+  route-registry plan (`plans/dual-mode-routing.md`) is free to introduce a prefix
+  scheme later without this being load-bearing.
+- `app.ts` intentionally omits the setup-guide's custom request/response logging hooks
+  (the ones that skip logging `/api/health`) — kept the scaffold minimal per this plan's
+  brief. Consequence: Fastify's built-in request logger currently logs every `/health`
+  hit at `info`. Flagged as a follow-up, not fixed here, since no health-check prober
+  exists yet to make the noise concrete.
+- `typescript` landed in `package.json` under `peerDependencies` (bun init's placement,
+  not `devDependencies`) even after `bun add -d typescript`; functionally fine —
+  `tsc` installs and `bun run typecheck` works — but worth knowing this is a Bun
+  convention, not a mistake, if it looks odd on review.
+- CI workflow (`.github/workflows/ci.yml`) was authored against the current
+  `oven-sh/setup-bun` README (pinned `@v2`, `bun-version-file: .tool-versions`) and
+  runs the exact same four commands verified locally. Opening PR #3 triggered the first
+  Actions run against this branch, which passed (`test: pass`) — confirmed and checked
+  off above in a follow-up commit to this closeout.
 
 ## Follow-ups
 
-_(populated at closeout)_
+- Consider re-adding the setup-guide's health-check-skipping logging hooks once a real
+  health-check prober (k8s liveness, uptime monitor, etc.) exists and the log noise is
+  worth suppressing.
+- The `fixtures/.gitsheets/example.toml` sheet config is a placeholder; `demo-world`
+  (plans/demo-world.md) replaces it with the real world model.
