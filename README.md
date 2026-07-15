@@ -25,3 +25,34 @@ A fifth use is native to 2026: the same primitive is an **agent sandbox** — fo
 ## Plans
 
 The build is decomposed as a dependency DAG in [`plans/`](plans/) — start at [`plans/README.md`](plans/README.md). Each plan freezes to `done` as the durable record of what got built.
+
+## Git exposure: debugging a session from the command line
+
+The facade mounts a read-only git smart-HTTP endpoint over the runtime repository (`src/plugins/git-http.ts`; see [`specs/facade.md`](specs/facade.md) § Git exposure). It advertises exactly three ref prefixes — `refs/fixtures/baseline/*`, `refs/sessions/*`, and pinned-session tags (`refs/tags/sessions/*/pinned`) — and serves fetch/clone only; there is no push path, at any layer.
+
+Given a session key (returned to the client at login, or found in a bug report), fetch its complete causal history — every request, response, and record mutation, traceable through the baseline to the exact application version:
+
+```sh
+# Configure the deployment's operator token once (never put it in the URL).
+export GIT_EXPOSURE_TOKEN=...
+
+git init debug-session && cd debug-session
+git -c http.extraHeader="Authorization: Bearer $GIT_EXPOSURE_TOKEN" \
+  fetch https://<deployment-host>/git refs/sessions/<session-key>:refs/heads/session
+
+# Pure session history — trunk/baseline commits never pollute this walk.
+git log --first-parent refs/heads/session
+
+# Every record mutation, with the request that caused it.
+git blame -- <sheet-root>/<record-path>
+
+# Provenance: the session's fork point is the one commit in --first-parent
+# history with two parents (specs/scenario-engine.md § Session lifecycle);
+# its second parent is the scenario baseline this session forked from.
+FORK=$(git log --first-parent --format=%H refs/heads/session | \
+  while read -r c; do [ "$(git cat-file -p "$c" | grep -c '^parent ')" = 2 ] && echo "$c" && break; done)
+git log --first-parent "$FORK^2"   # the baseline lineage, down to the exact app version
+git log --format='%H %(trailers:key=Scenario-name,valueonly)' -1 "$FORK"  # scenario identity, from the ref alone
+```
+
+`GIT_EXPOSURE_TOKEN` gates the endpoint (deny-by-default: an unset or wrong token is refused, never left open — see `.env.example` and `src/plugins/git-http.ts`'s module comment for the full auth-gate and ref-scoping mechanism).

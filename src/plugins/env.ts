@@ -44,6 +44,18 @@ const schema = {
     APP_COMMIT_HASH: {
       type: "string",
     },
+    // Git exposure (see specs/facade.md § Git exposure, src/plugins/git-http.ts):
+    // the read-only smart-HTTP mount path, and the operator bearer token that
+    // gates it. An unset/empty token means the endpoint refuses every
+    // request — deployments opt in explicitly, never by omission.
+    GIT_EXPOSURE_PATH: {
+      type: "string",
+      default: "/git",
+    },
+    GIT_EXPOSURE_TOKEN: {
+      type: "string",
+      default: "",
+    },
   },
 };
 
@@ -59,6 +71,8 @@ declare module "fastify" {
       FIXTURES_PATH: string;
       APP_VERSION: string;
       APP_COMMIT_HASH?: string;
+      GIT_EXPOSURE_PATH: string;
+      GIT_EXPOSURE_TOKEN: string;
     };
   }
 }
