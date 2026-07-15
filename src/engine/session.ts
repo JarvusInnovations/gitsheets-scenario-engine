@@ -28,6 +28,16 @@ export interface ForkSessionOptions {
   gitDir: string;
   scenario: string;
   appVersion: string;
+  /**
+   * Per-session backend override for `dual` routes, set at login
+   * (specs/facade.md § Mode model: "overridable per session at login for
+   * dual routes"). Recorded as a `Mode-Override:` trailer on the fork merge
+   * commit — same self-describing-from-the-ref-alone treatment as
+   * `Scenario-name:`. Untyped here (plain string) deliberately: session.ts
+   * has no business knowing the routing layer's `Backend` union; the
+   * routing plugin (src/routing/mode.ts) validates/narrows it on read.
+   */
+  modeOverride?: string;
 }
 
 export interface ForkSessionResult {
@@ -59,6 +69,7 @@ async function forkSessionAt(opts: {
   scenario: string;
   appVersion: string;
   baselineCommitHash: string;
+  modeOverride?: string;
 }): Promise<ForkSessionResult> {
   const identity = { ...plumbing.ENGINE_IDENTITY, date: FORK_IDENTITY_DATE };
 
@@ -69,12 +80,19 @@ async function forkSessionAt(opts: {
   });
 
   const baselineTree = await plumbing.treeOf(opts.gitDir, opts.baselineCommitHash);
-  const mergeMessage = [
+  const mergeMessageLines = [
     `fork session ${opts.sessionKey}`,
     "",
     `Scenario-name: ${opts.scenario}`,
     `App-Version: ${opts.appVersion}`,
-  ].join("\n");
+  ];
+  // Only present when a login explicitly chose a backend for `dual` routes —
+  // absent by default, which preserves the exact merge-commit bytes (and
+  // therefore hash) of every existing fork() call site untouched by this.
+  if (opts.modeOverride) {
+    mergeMessageLines.push(`Mode-Override: ${opts.modeOverride}`);
+  }
+  const mergeMessage = mergeMessageLines.join("\n");
 
   const mergeCommitHash = await plumbing.commitTree(opts.gitDir, baselineTree, {
     parents: [rootCommitHash, opts.baselineCommitHash],
@@ -89,12 +107,12 @@ async function forkSessionAt(opts: {
 }
 
 /**
- * Read a session's scenario identity back from its ref alone (no side
- * state): resolve the ref to the merge commit and parse its Scenario-name
- * trailer. Per spec: "the engine recovers scenario identity by reading
- * trailers from the log, never from side state."
+ * Read a session's fork (merge) commit's trailers back from its ref alone
+ * (no side state) — the shared core behind resolveSessionScenario() and
+ * resolveSessionFork() below. Per spec: "the engine recovers scenario
+ * identity by reading trailers from the log, never from side state."
  */
-export async function resolveSessionScenario(gitDir: string, sessionKey: string): Promise<string> {
+async function forkTrailers(gitDir: string, sessionKey: string): Promise<Record<string, string>> {
   const ref = sessionRef(sessionKey);
   const tip = await plumbing.resolveRef(gitDir, ref);
   if (!tip) throw new SessionNotFoundError(sessionKey);
@@ -106,28 +124,49 @@ export async function resolveSessionScenario(gitDir: string, sessionKey: string)
   for (const commitHash of await plumbing.firstParentLog(gitDir, ref)) {
     const parents = await plumbing.parentsOf(gitDir, commitHash);
     if (parents.length === 2) {
-      const trailers = await plumbing.commitTrailers(gitDir, commitHash);
-      const scenario = trailers["Scenario-name"];
-      if (!scenario)
-        throw new Error(
-          `fork commit ${commitHash} for session ${sessionKey} is missing Scenario-name trailer`,
-        );
-      return scenario;
+      return plumbing.commitTrailers(gitDir, commitHash);
     }
   }
   throw new Error(`no fork (merge) commit found in first-parent history of session ${sessionKey}`);
 }
 
+/** Read a session's scenario identity back from its ref alone. */
+export async function resolveSessionScenario(gitDir: string, sessionKey: string): Promise<string> {
+  const trailers = await forkTrailers(gitDir, sessionKey);
+  const scenario = trailers["Scenario-name"];
+  if (!scenario)
+    throw new Error(`fork commit for session ${sessionKey} is missing Scenario-name trailer`);
+  return scenario;
+}
+
 /**
- * Reset a session: delete its ref and re-fork it from the same scenario at
- * the *current* baseline. Cheap — nothing else references session refs.
+ * Read a session's scenario identity + optional per-session backend
+ * override back from its ref alone in one trailer read (used by the
+ * session-resolution onRequest hook, which needs both per request). See
+ * ForkSessionOptions.modeOverride for why the override is untyped here.
+ */
+export async function resolveSessionFork(
+  gitDir: string,
+  sessionKey: string,
+): Promise<{ scenario: string; modeOverride?: string }> {
+  const trailers = await forkTrailers(gitDir, sessionKey);
+  const scenario = trailers["Scenario-name"];
+  if (!scenario)
+    throw new Error(`fork commit for session ${sessionKey} is missing Scenario-name trailer`);
+  return { scenario, modeOverride: trailers["Mode-Override"] };
+}
+
+/**
+ * Reset a session: delete its ref and re-fork it from the same scenario (and
+ * the same mode override, if any) at the *current* baseline. Cheap — nothing
+ * else references session refs.
  */
 export async function resetSession(opts: {
   gitDir: string;
   sessionKey: string;
   appVersion: string;
 }): Promise<ForkSessionResult> {
-  const scenario = await resolveSessionScenario(opts.gitDir, opts.sessionKey);
+  const { scenario, modeOverride } = await resolveSessionFork(opts.gitDir, opts.sessionKey);
   const baselineCommitHash = await plumbing.resolveRef(opts.gitDir, baselineRef(scenario));
   if (!baselineCommitHash) throw new ScenarioNotFoundError(scenario);
 
@@ -139,5 +178,6 @@ export async function resetSession(opts: {
     scenario,
     appVersion: opts.appVersion,
     baselineCommitHash,
+    modeOverride,
   });
 }

@@ -1,0 +1,33 @@
+# The route parity ledger's sheet config. See registry/README.md and
+# specs/facade.md § Mode model: "The parity ledger is the registry itself —
+# a reviewable file (a gitsheet, naturally) tracking each route's status
+# with links to the scenario behaviors that define it."
+[gitsheet]
+root = 'routes'
+path = '${{ id }}'
+
+[gitsheet.schema]
+type = 'object'
+required = ['id', 'method', 'path', 'mode', 'behaviors']
+
+[gitsheet.schema.properties.id]
+type = 'string'
+pattern = '^[a-z0-9-]+$'
+
+[gitsheet.schema.properties.method]
+type = 'string'
+enum = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
+
+[gitsheet.schema.properties.path]
+type = 'string'
+
+[gitsheet.schema.properties.mode]
+type = 'string'
+enum = ['offline-only', 'online-only', 'dual']
+
+[gitsheet.schema.properties.behaviors]
+type = 'array'
+items.type = 'string'
+
+[gitsheet.schema.properties.notes]
+type = 'string'

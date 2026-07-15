@@ -66,6 +66,18 @@ const schema = {
       type: "number",
       default: 5 * 60 * 1000, // 5m
     },
+    // Dual-mode routing (specs/facade.md § Mode model, plans/dual-mode-routing.md):
+    // the route parity ledger's on-disk root, and the deployment default
+    // backend for `dual` routes when a session has no login-time override.
+    REGISTRY_PATH: {
+      type: "string",
+      default: "registry",
+    },
+    DEFAULT_DUAL_MODE: {
+      type: "string",
+      enum: ["offline", "online"],
+      default: "offline",
+    },
   },
 };
 
@@ -85,6 +97,8 @@ declare module "fastify" {
       GIT_EXPOSURE_TOKEN: string;
       SESSION_TTL_MS: number;
       SESSION_GC_INTERVAL_MS: number;
+      REGISTRY_PATH: string;
+      DEFAULT_DUAL_MODE: "offline" | "online";
     };
   }
 }

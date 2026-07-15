@@ -20,6 +20,15 @@ export const SESSION_HEADER = "x-session-key";
 export interface ResolvedSession {
   key: string;
   scenario: string;
+  /**
+   * The backend this session was pinned to at login, for `dual` routes
+   * (specs/facade.md § Mode model). Plain `string`, not the routing layer's
+   * `Backend` union — this plugin doesn't depend on src/routing/*; the
+   * routing plugin's onRequest hook (registered after this one) narrows and
+   * validates it. Undefined means "no override — deployment default
+   * applies."
+   */
+  modeOverride?: string;
 }
 
 declare module "fastify" {
@@ -90,8 +99,8 @@ const enginePlugin: FastifyPluginAsync = async (fastify) => {
           done();
           return;
         }
-        const scenario = await store.sessionScenario(sessionKey);
-        request.session = { key: sessionKey, scenario };
+        const { scenario, modeOverride } = await store.sessionFork(sessionKey);
+        request.session = { key: sessionKey, scenario, modeOverride };
         done();
       })
       .catch((err) => {

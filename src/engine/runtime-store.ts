@@ -51,6 +51,7 @@ import { runBootImport } from "./boot-import.ts";
 import {
   forkSession,
   resetSession,
+  resolveSessionFork,
   resolveSessionScenario,
   sessionRef,
   SessionNotFoundError,
@@ -153,8 +154,19 @@ export class RuntimeStore {
     return this.#booted;
   }
 
-  async fork(scenario: string): Promise<ForkSessionResult> {
-    return forkSession({ gitDir: this.gitDir, scenario, appVersion: this.appVersion });
+  /**
+   * `opts.modeOverride` (specs/facade.md § Mode model): the backend a login
+   * pins this session to for `dual` routes, recorded as a trailer on the
+   * fork commit. Left undefined, the deployment default applies instead —
+   * see src/routing/mode.ts.
+   */
+  async fork(scenario: string, opts?: { modeOverride?: string }): Promise<ForkSessionResult> {
+    return forkSession({
+      gitDir: this.gitDir,
+      scenario,
+      appVersion: this.appVersion,
+      modeOverride: opts?.modeOverride,
+    });
   }
 
   async reset(sessionKey: string): Promise<ForkSessionResult> {
@@ -167,6 +179,11 @@ export class RuntimeStore {
 
   async sessionScenario(sessionKey: string): Promise<string> {
     return resolveSessionScenario(this.gitDir, sessionKey);
+  }
+
+  /** Scenario + per-session backend override in one trailer read — see resolveSessionFork(). */
+  async sessionFork(sessionKey: string): Promise<{ scenario: string; modeOverride?: string }> {
+    return resolveSessionFork(this.gitDir, sessionKey);
   }
 
   /**

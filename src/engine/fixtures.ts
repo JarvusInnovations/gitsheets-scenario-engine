@@ -12,7 +12,14 @@ import type { TreeEntry } from "./plumbing.ts";
 /** A flat map of repo-root-relative POSIX path -> file bytes. */
 export type FileMap = Map<string, Buffer>;
 
-async function walkDir(root: string, base = root): Promise<FileMap> {
+/**
+ * Recursively read every file under `root` into a flat path -> bytes map,
+ * relative to `base` (defaults to `root`). Skips `.gitkeep` placeholders.
+ * Exported for reuse by other deterministic tree importers that share this
+ * shape (e.g. src/routing/registry-import.ts importing the route parity
+ * ledger) — the walk itself has nothing fixtures-specific about it.
+ */
+export async function walkDir(root: string, base = root): Promise<FileMap> {
   const files: FileMap = new Map();
   let entries: string[];
   try {
