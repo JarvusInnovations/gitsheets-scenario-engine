@@ -1,0 +1,6 @@
+id = "get-order-notifications"
+method = "GET"
+path = "/orders/:id/notifications"
+mode = "offline-only"
+behaviors = ["demo-world: order-notifications"]
+notes = "Executable spec for an unbuilt notifications backend: lists the push-notification records the order state machine emitted."

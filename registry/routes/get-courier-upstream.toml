@@ -1,0 +1,6 @@
+id = "get-courier-upstream"
+method = "GET"
+path = "/couriers/:id/upstream"
+mode = "online-only"
+behaviors = ["demo-world: courier-upstream-lookup"]
+notes = "Pass-through stub for a not-yet-built courier-roster upstream. No session required, no commit."

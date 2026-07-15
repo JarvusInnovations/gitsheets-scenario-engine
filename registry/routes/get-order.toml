@@ -1,0 +1,6 @@
+id = "get-order"
+method = "GET"
+path = "/orders/:id"
+mode = "dual"
+behaviors = ["demo-world: order-lookup"]
+notes = "Dual-mode order lookup; offline reads the session's orders sheet, online echoes a stub upstream shape. Both branches satisfy orderViewSchema (src/routes/orders.ts) — the serializer-parity demo."
