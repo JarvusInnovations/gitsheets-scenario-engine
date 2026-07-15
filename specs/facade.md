@@ -6,7 +6,7 @@ The facade presents **one API surface** with two interchangeable backends per ro
 
 ## Stack
 
-The facade is **Fastify** (5.x, Node ≥ 20). This is prescribed, not suggested — the template ships working Fastify code, and the spec's structural concepts map onto Fastify primitives:
+The facade is **Fastify 5.x on Bun** — the house backend stack, vendored as the [`jarvus-fastify`](../.claude/skills/jarvus-fastify/SKILL.md) skill (Bun as runtime, package manager, test runner, and watch dev server; TypeScript executed directly, `tsc --noEmit` for type-checking only; no npm, no build step). This is prescribed, not suggested — the template ships working Fastify code, and the spec's structural concepts map onto Fastify primitives:
 
 - The **scenario engine binds as a Fastify plugin** (`fastify-plugin`): decorates the instance with the engine/store, decorates requests with the resolved session — a **session-scoped `Repository` handle**, so gitsheets' commit-time auto-refresh stays session-local (see the scenario-engine spec's gitsheets mapping) — and registers the session-resolution `onRequest` hook and the request=commit wrapping around handler execution.
 - The **route registry entries attach as route config** (`config.lensMode`-style route options: `offline-only` | `online-only` | `dual`), so mode resolution happens per-route in a hook rather than in handler code, and the registry file is validated against the actually-registered routes at boot (drift between ledger and code fails startup).
