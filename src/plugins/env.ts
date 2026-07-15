@@ -56,6 +56,16 @@ const schema = {
       type: "string",
       default: "",
     },
+    // Session lifecycle GC — see specs/scenario-engine.md § Session lifecycle
+    // (Expire/GC) and src/plugins/session-gc.ts.
+    SESSION_TTL_MS: {
+      type: "number",
+      default: 24 * 60 * 60 * 1000, // 24h
+    },
+    SESSION_GC_INTERVAL_MS: {
+      type: "number",
+      default: 5 * 60 * 1000, // 5m
+    },
   },
 };
 
@@ -73,6 +83,8 @@ declare module "fastify" {
       APP_COMMIT_HASH?: string;
       GIT_EXPOSURE_PATH: string;
       GIT_EXPOSURE_TOKEN: string;
+      SESSION_TTL_MS: number;
+      SESSION_GC_INTERVAL_MS: number;
     };
   }
 }
