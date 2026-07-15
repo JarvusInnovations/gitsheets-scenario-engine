@@ -26,6 +26,31 @@ A fifth use is native to 2026: the same primitive is an **agent sandbox** — fo
 
 The build is decomposed as a dependency DAG in [`plans/`](plans/) — start at [`plans/README.md`](plans/README.md). Each plan freezes to `done` as the durable record of what got built.
 
+## Demo world
+
+The template ships a small runnable example (`plans/demo-world.md`) — a delivery-desk
+domain (`fixtures/.gitsheets/{couriers,orders,notifications,clock}.toml`) with two
+scenarios (`standard-day`, `rush-hour`) and a handful of routes
+(`src/routes/{session,orders,couriers}.ts`) demonstrating every load-bearing concept: a
+`dual` route, `offline-only` routes, an `online-only` route, and a non-trivial state
+machine (an order moving `pending -> accepted -> in-progress -> completed`) implemented
+entirely as plain handler code over records — see `specs/facade.md` § Offline mode's
+all-state-in-records discipline.
+
+```sh
+bun install
+bun run dev              # starts the facade on :3001 (see .env.example)
+
+# in another shell:
+scripts/demo.sh          # login -> drive the state machine -> clone the session
+```
+
+`scripts/demo.sh` accepts `BASE_URL`, `SCENARIO`, `ORDER_ID`, and (to exercise the
+git-exposure clone below rather than a direct `git clone` of the runtime repo)
+`GIT_EXPOSURE_TOKEN` as environment overrides — try `SCENARIO=rush-hour
+ORDER_ID=order-2002 scripts/demo.sh` to see the divergent scenario's `409 no couriers
+available` response.
+
 ## Git exposure: debugging a session from the command line
 
 The facade mounts a read-only git smart-HTTP endpoint over the runtime repository (`src/plugins/git-http.ts`; see [`specs/facade.md`](specs/facade.md) § Git exposure). It advertises exactly three ref prefixes — `refs/fixtures/baseline/*`, `refs/sessions/*`, and pinned-session tags (`refs/tags/sessions/*/pinned`) — and serves fetch/clone only; there is no push path, at any layer.
