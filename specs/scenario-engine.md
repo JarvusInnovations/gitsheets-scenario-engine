@@ -59,13 +59,18 @@ Read-only requests do not commit by default; a deployment may opt into logging r
 - One session = one writer at a time: requests within a session serialize (per-session queue); the CAS ref update is the backstop, and a lost race is a bug, not a retry loop.
 - Cross-session concurrency is unlimited — sessions share nothing but ancestry.
 
-## gitsheets 2.x mapping and open questions
+## gitsheets 2.x mapping
 
-Maps directly: `repo.transact` (one per request), CAS `updateRef`, schema validation, canonical serialization (idempotent event replay), bare-repo operation, `Sheet.defineIndex` for the facade's lookups.
+The engine is now **mostly conventions over shipped gitsheets primitives**: the 2.x line (2.4.0 current, bindings published to npm and cold-verified) has absorbed what the original implementation hand-rolled on a legacy API. The mapping is concrete, and the questions the first draft flagged as open have since been answered by shipped behavior:
 
-To validate against the current core (candidate upstream issues if they don't hold):
+- **Session refs as transaction targets** — `repo.transact` takes explicit `parent` and `branch` options ([gitsheets `api/repository.md`](https://github.com/JarvusInnovations/gitsheets/blob/develop/specs/api/repository.md)): fork and every request commit pass `parent` and `branch` = `refs/sessions/<key>`. Because session refs live outside `refs/heads/`, `branch` must be passed explicitly — transact only defaults it for actual branches. That's the one ergonomic wrinkle, and it's a parameter, not a gap.
+- **Post-commit read freshness** — resolved by the shipped freshness model ([gitsheets `behaviors/freshness.md`](https://github.com/JarvusInnovations/gitsheets/blob/develop/specs/behaviors/freshness.md)): `repo.transact` auto-rebinds every live `Sheet` to the new `HEAD` tree on commit, so a handler's later reads within the same request observe its own writes with no manual refresh; `repo.refresh()` covers out-of-band ref movement (a GC sweep, an external fetch).
+  - **Design consequence — one `Repository` handle per session (or per request), never one global handle.** Auto-refresh rebinds the sheets *that repository instance* issued; a single shared handle across concurrent sessions would let session A's commit yank session B's read snapshot. The engine plugin scopes a handle to the resolved session, which also gives each session its own transaction mutex for free.
+- **Per-session single-writer serialization** — `repo.withLock` is the per-session queue; transact's own commit mutex and the CAS ref update are the backstop. A lost CAS race means two writers entered one session — a bug to surface, not a retry loop, exactly as *Concurrency* requires.
+- **Streaming payloads** — `repo.readBlobStream` serves large captured request/response bodies or attachment blobs without materializing them, for scenarios that carry media.
+- Maps unchanged from the first draft: one `repo.transact` per request, CAS `updateRef`, in-core JSON-Schema validation, canonical serialization (idempotent event replay), bare-repo operation, and the indexing behavior ([gitsheets `behaviors/indexing.md`](https://github.com/JarvusInnovations/gitsheets/blob/develop/specs/behaviors/indexing.md)) for the facade's lookups.
 
-- **Per-request transaction latency** at interactive budgets (target: single-digit ms on session-scale trees; the Rust core's measured ~25ms single-upsert on an 18k-record tree suggests comfortable headroom at typical scenario scale).
-- **Ref namespace ergonomics** — transactions targeting `refs/sessions/*` rather than branches.
-- **Post-commit read freshness** within a session (per-sheet refresh; gitsheets#184).
-- **Ephemeral-ref GC** — nothing needed from gitsheets, but the template must ship the sweep.
+Still to measure during the build — benchmarks, not gaps:
+
+- **Per-request transaction latency** at interactive budgets on session-scale trees (target: single-digit to low-double-digit ms). The Rust core's published bench (single upsert on an 18k-record tree) suggests comfortable headroom at typical scenario scale; the real variables to profile are the facade's per-request handle setup and session-fork depth.
+- **Ephemeral-ref GC cost** at thousands of live sessions — nothing needed from gitsheets, but the sweep and its `git gc` cadence are the template's to tune.
